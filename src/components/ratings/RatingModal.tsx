@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { getErrorMessage } from '@/lib/errors';
 
 type RatingModalProps = {
   listingId: string;
@@ -41,7 +42,7 @@ export default function RatingModal({ listingId, ratedUserId, ratedUserName, isO
           rater_id: user.id,
           rated_user_id: ratedUserId,
           listing_id: listingId,
-          score: rating
+          rating_value: rating
         });
 
       if (dbError) {
@@ -58,8 +59,8 @@ export default function RatingModal({ listingId, ratedUserId, ratedUserName, isO
         setRating(0);
       }, 2000);
       
-    } catch (err: any) {
-      setError(err.message || 'Failed to submit rating');
+    } catch (err) {
+      setError(getErrorMessage(err, 'Failed to submit rating'));
     } finally {
       setIsSubmitting(false);
     }

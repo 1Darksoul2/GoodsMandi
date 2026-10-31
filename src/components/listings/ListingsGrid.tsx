@@ -96,7 +96,7 @@ export default function ListingsGrid({ initialListings, fetchError }: ListingsGr
           <select
             className="input-field w-full md:w-auto bg-slate-900 text-slate-200 border-white/10 appearance-none"
             value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as any)}
+            onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
           >
             <option value="newest" className="bg-slate-900 text-slate-200">Newest First</option>
             <option value="price_low" className="bg-slate-900 text-slate-200">Price: Low to High</option>

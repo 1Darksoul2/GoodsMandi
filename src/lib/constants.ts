@@ -7,6 +7,14 @@ export const APP_NAME = 'GoodsMandi';
 // Minimum bid percentage (70% of asking price)
 export const MIN_BID_PERCENTAGE = 0.70;
 
+// Max bid attempts (first bid + revisions) per user per listing; enforced in the database too
+export const MAX_BID_ATTEMPTS = 3;
+
+/** Smallest whole-rupee bid the database will accept (it requires >= ROUND(price * 0.70, 2)). */
+export function minimumBid(askingPrice: number): number {
+  return Math.ceil(Math.round(askingPrice * MIN_BID_PERCENTAGE * 100) / 100);
+}
+
 // Max photos per listing
 export const MAX_PHOTOS_PER_LISTING = 5;
 
@@ -47,7 +55,7 @@ export const LISTING_STATUSES = ['active', 'sold', 'removed'] as const;
 export type ListingStatus = (typeof LISTING_STATUSES)[number];
 
 // Bid statuses
-export const BID_STATUSES = ['pending', 'selected', 'rejected'] as const;
+export const BID_STATUSES = ['pending', 'selected', 'rejected', 'backup'] as const;
 export type BidStatus = (typeof BID_STATUSES)[number];
 
 // Report statuses

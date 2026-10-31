@@ -2,16 +2,30 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { createClient } from '@/lib/supabase/client';
 import { timeAgo } from '@/lib/utils';
-import { ChatMessage, Profile, Listing } from '@/lib/types';
+import { getErrorMessage } from '@/lib/errors';
+
+type ParticipantRow = { id: string; name: string; profile_photo_url: string | null };
+type MessageRow = {
+  id: string;
+  listing_id: string;
+  sender_id: string;
+  recipient_id: string;
+  message_text: string;
+  created_at: string;
+  listing: { title: string } | null;
+  sender: ParticipantRow | null;
+  recipient: ParticipantRow | null;
+};
 
 type Conversation = {
   listing_id: string;
   other_user_id: string;
   listing_title: string;
   other_user_name: string;
-  other_user_photo?: string;
+  other_user_photo?: string | null;
   last_message: string;
   last_message_time: string;
 };
@@ -20,7 +34,7 @@ export default function ChatListPage() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
-  const supabase = createClient();
+  const [supabase] = useState(() => createClient());
 
   useEffect(() => {
     async function fetchConversations() {
@@ -43,7 +57,8 @@ export default function ChatListPage() {
             recipient:profiles!recipient_id ( id, name, profile_photo_url )
           `)
           .or(`sender_id.eq.${user.id},recipient_id.eq.${user.id}`)
-          .order('created_at', { ascending: false });
+          .order('created_at', { ascending: false })
+          .overrideTypes<MessageRow[], { merge: false }>();
 
         if (error) {
           console.error('Error fetching conversations:', error.message, error.code, error.details, error.hint);
@@ -54,7 +69,7 @@ export default function ChatListPage() {
         // Group by conversation (listing_id + other_user_id)
         const convMap = new Map<string, Conversation>();
 
-        messages?.forEach((msg: any) => {
+        messages?.forEach((msg) => {
           const isSender = msg.sender_id === user.id;
           const otherUser = isSender ? msg.recipient : msg.sender;
           
@@ -76,16 +91,16 @@ export default function ChatListPage() {
         });
 
         setConversations(Array.from(convMap.values()));
-      } catch (err: any) {
-        console.error('Error fetching conversations:', err?.message || err);
-        setFetchError(err?.message || 'An unexpected error occurred');
+      } catch (err) {
+        console.error('Error fetching conversations:', getErrorMessage(err));
+        setFetchError(getErrorMessage(err, 'An unexpected error occurred'));
       } finally {
         setLoading(false);
       }
     }
 
     fetchConversations();
-  }, []);
+  }, [supabase]);
 
   if (loading) {
     return (
@@ -131,9 +146,9 @@ export default function ChatListPage() {
               className="block glass-card glass-card-hover rounded-xl p-4 transition-all duration-200"
             >
               <div className="flex items-center space-x-4">
-                <div className="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center overflow-hidden flex-shrink-0 border border-slate-700">
+                <div className="relative w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center overflow-hidden flex-shrink-0 border border-slate-700">
                   {conv.other_user_photo ? (
-                    <img src={conv.other_user_photo} alt={conv.other_user_name} className="w-full h-full object-cover" />
+                    <Image src={conv.other_user_photo} alt={conv.other_user_name} fill className="object-cover" sizes="48px" />
                   ) : (
                     <span className="text-xl font-medium text-slate-300">{conv.other_user_name.charAt(0)}</span>
                   )}

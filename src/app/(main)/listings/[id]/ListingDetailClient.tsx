@@ -8,9 +8,16 @@ import { createClient } from '@/lib/supabase/client';
 import BidDashboard from '@/components/listings/BidDashboard';
 import BidModalController from './BidModalController';
 import DeleteListingButton from './DeleteListingButton';
+import RatingModal from '@/components/ratings/RatingModal';
+import type { Listing } from '@/lib/types';
+
+export type ListingDetail = Omit<Listing, 'seller'> & {
+  seller: { id: string; name: string; profile_photo_url: string | null; rating_avg: number; total_items_sold: number };
+  winner: { id: string; name: string } | null;
+};
 
 interface ListingDetailClientProps {
-  listing: any;
+  listing: ListingDetail;
   categoryColor: string;
   serverUserId: string | null;
 }
@@ -18,13 +25,11 @@ interface ListingDetailClientProps {
 export default function ListingDetailClient({ listing, categoryColor, serverUserId }: ListingDetailClientProps) {
   const [currentUserId, setCurrentUserId] = useState<string | null>(serverUserId);
   const [authChecked, setAuthChecked] = useState(!!serverUserId);
+  const [isRatingOpen, setIsRatingOpen] = useState(false);
 
   // Client-side auth check as fallback when server-side auth returns null
   useEffect(() => {
-    if (serverUserId) {
-      setAuthChecked(true);
-      return;
-    }
+    if (serverUserId) return;
 
     const supabase = createClient();
     supabase.auth.getUser().then(({ data }) => {
@@ -36,6 +41,7 @@ export default function ListingDetailClient({ listing, categoryColor, serverUser
   }, [serverUserId]);
 
   const isSeller = authChecked && currentUserId === listing.seller_id;
+  const isBuyer = authChecked && !!currentUserId && currentUserId === listing.selected_bidder_id;
   const isSold = listing.status === 'sold';
   const isRemoved = listing.status === 'removed';
   const mainPhoto = listing.photos && listing.photos.length > 0 ? listing.photos[0] : null;
@@ -140,11 +146,14 @@ export default function ListingDetailClient({ listing, categoryColor, serverUser
             {isSold && (
               <div className="p-4 rounded-xl bg-slate-800/50 border border-slate-700 mt-4 text-center">
                 <p className="text-slate-300">This item has been sold to <span className="font-semibold text-white">{listing.winner?.name || 'a buyer'}</span></p>
-                {(currentUserId === listing.selected_bidder_id || isSeller) && (
+                {(isBuyer || isSeller) && (
                   <div className="mt-4 flex gap-3 justify-center">
                     <Link href={`/chat/${listing.id}/${isSeller ? listing.selected_bidder_id : listing.seller_id}`} className="btn-secondary text-sm">
                       Open Chat
                     </Link>
+                    <button type="button" onClick={() => setIsRatingOpen(true)} className="btn-secondary text-sm">
+                      {isSeller ? 'Rate Buyer' : 'Rate Seller'}
+                    </button>
                   </div>
                 )}
               </div>
@@ -202,6 +211,15 @@ export default function ListingDetailClient({ listing, categoryColor, serverUser
         <div className="mt-10">
           <BidDashboard listingId={listing.id} askingPrice={listing.asking_price} />
         </div>
+      )}
+      {isSold && (isBuyer || isSeller) && listing.selected_bidder_id && (
+        <RatingModal
+          isOpen={isRatingOpen}
+          onClose={() => setIsRatingOpen(false)}
+          listingId={listing.id}
+          ratedUserId={isSeller ? listing.selected_bidder_id : listing.seller_id}
+          ratedUserName={isSeller ? listing.winner?.name || 'the buyer' : listing.seller.name}
+        />
       )}
     </div>
   );

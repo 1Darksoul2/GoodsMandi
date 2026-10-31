@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
+import Link from 'next/link';
 import ListingsGrid from '@/components/listings/ListingsGrid';
 
 export const metadata = {
@@ -29,12 +30,12 @@ export default async function ListingsPage() {
           <h1 className="text-3xl font-bold text-white mb-2">Campus Marketplace</h1>
           <p className="text-slate-400">Discover and buy items from your peers.</p>
         </div>
-        <a href="/listings/create" className="btn-primary flex items-center gap-2">
+        <Link href="/listings/create" className="btn-primary flex items-center gap-2">
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
           </svg>
           Sell Item
-        </a>
+        </Link>
       </div>
       
       <ListingsGrid initialListings={listings || []} fetchError={error ? error.message : null} />

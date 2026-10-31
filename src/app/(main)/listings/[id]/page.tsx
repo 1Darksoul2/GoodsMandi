@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { notFound } from 'next/navigation';
 import { CATEGORY_COLORS } from '@/lib/constants';
-import ListingDetailClient from './ListingDetailClient';
+import ListingDetailClient, { type ListingDetail } from './ListingDetailClient';
 
 export default async function ListingDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -20,7 +20,7 @@ export default async function ListingDetailPage({ params }: { params: Promise<{ 
       winner:profiles!selected_bidder_id(id, name)
     `)
     .eq('id', id)
-    .single();
+    .single<ListingDetail>();
 
   if (error || !listing) {
     notFound();

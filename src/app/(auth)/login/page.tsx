@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { useToast } from '@/components/ui/Toast'
 import { Spinner } from '@/components/ui/Spinner'
+import { getErrorMessage } from '@/lib/errors'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -40,7 +41,7 @@ export default function LoginPage() {
         router.push('/listings')
         router.refresh()
       }
-    } catch (err: any) {
+    } catch {
       showToast('An unexpected error occurred.', 'error')
     } finally {
       setLoading(false)
@@ -57,7 +58,9 @@ export default function LoginPage() {
 
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth/reset-password`,
+        // The email link carries a one-time code; /auth/callback exchanges it for a
+        // session and then forwards to the reset page (which lives at /reset-password).
+        redirectTo: `${window.location.origin}/auth/callback?next=/reset-password`,
       })
 
       if (error) {
@@ -66,8 +69,8 @@ export default function LoginPage() {
         setResetSent(true)
         showToast('Password reset email sent! Check your inbox.', 'success')
       }
-    } catch (err: any) {
-      showToast(err?.message || 'Failed to send reset email.', 'error')
+    } catch (err) {
+      showToast(getErrorMessage(err, 'Failed to send reset email.'), 'error')
     } finally {
       setResetLoading(false)
     }

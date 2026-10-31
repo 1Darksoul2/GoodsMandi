@@ -10,6 +10,8 @@ interface PhotoUploadProps {
 
 const MAX_PHOTOS = 5;
 const MAX_SIZE_MB = 5;
+// Must match allowed_mime_types on the storage buckets (migration 005).
+const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 
 export default function PhotoUpload({ photos, onChange }: PhotoUploadProps) {
   const [isDragging, setIsDragging] = useState(false);
@@ -37,8 +39,8 @@ export default function PhotoUpload({ photos, onChange }: PhotoUploadProps) {
     const newPhotos = Array.from(files);
 
     for (const file of newPhotos) {
-      if (!file.type.startsWith('image/')) {
-        setError('Only image files are allowed.');
+      if (!ALLOWED_TYPES.includes(file.type)) {
+        setError('Only JPEG, PNG, WebP or GIF images are allowed.');
         continue;
       }
       if (file.size > MAX_SIZE_MB * 1024 * 1024) {
@@ -93,7 +95,7 @@ export default function PhotoUpload({ photos, onChange }: PhotoUploadProps) {
         >
           <input
             type="file"
-            accept="image/*"
+            accept={ALLOWED_TYPES.join(',')}
             multiple
             onChange={handleFileInput}
             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
