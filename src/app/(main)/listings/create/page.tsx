@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { LISTING_CATEGORIES, PRODUCT_AGE_BRACKETS, PROHIBITED_KEYWORDS } from '@/lib/constants';
 import PhotoUpload from '@/components/listings/PhotoUpload';
+import { getErrorMessage } from '@/lib/errors';
 
 export default function CreateListingPage() {
   const router = useRouter();
@@ -59,22 +60,23 @@ export default function CreateListingPage() {
 
       const { data: profile } = await supabase
         .from('profiles')
-        .select('is_banned')
+        .select('banned')
         .eq('id', userData.user.id)
         .single();
 
-      if (profile?.is_banned) {
+      if (profile?.banned) {
         throw new Error('Your account is restricted from creating listings.');
       }
 
       // Upload photos
       const photoUrls: string[] = [];
       for (const file of photos) {
-        const fileExt = file.name.split('.').pop();
+        // Extension from the MIME type, not the user-supplied file name.
+        const fileExt = file.type.split('/')[1] || 'jpg';
         const fileName = `${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
         const filePath = `${userData.user.id}/${fileName}`;
 
-        const { error: uploadError, data } = await supabase.storage
+        const { error: uploadError } = await supabase.storage
           .from('listing-photos')
           .upload(filePath, file);
 
@@ -106,8 +108,8 @@ export default function CreateListingPage() {
       if (insertError) throw insertError;
 
       router.push(`/listings/${newListing.id}`);
-    } catch (err: any) {
-      setError(err.message || 'Failed to create listing');
+    } catch (err) {
+      setError(getErrorMessage(err, 'Failed to create listing'));
       setLoading(false);
     }
   };

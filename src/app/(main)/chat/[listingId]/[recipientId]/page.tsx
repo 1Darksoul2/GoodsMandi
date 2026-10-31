@@ -6,11 +6,14 @@ import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { timeAgo } from '@/lib/utils';
 import ReportModal from '@/components/reports/ReportModal';
+import { getErrorMessage } from '@/lib/errors';
+import type { RealtimeChannel } from '@supabase/supabase-js';
 
 type Message = {
   id: string;
   message_text: string;
   sender_id: string;
+  recipient_id?: string;
   created_at: string;
 };
 
@@ -28,9 +31,10 @@ export default function ChatThreadPage() {
   const [recipientName, setRecipientName] = useState('User');
   const [listingTitle, setListingTitle] = useState('Listing');
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const supabase = createClient();
+  const [supabase] = useState(() => createClient());
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -41,7 +45,7 @@ export default function ChatThreadPage() {
   }, [messages]);
 
   useEffect(() => {
-    let subscription: any;
+    let subscription: RealtimeChannel | undefined;
 
     async function fetchInitialData() {
       try {
@@ -61,7 +65,7 @@ export default function ChatThreadPage() {
         // Fetch messages
         const { data: msgs, error } = await supabase
           .from('chat_messages')
-          .select('id, message_text, sender_id, created_at')
+          .select('id, message_text, sender_id, recipient_id, created_at')
           .eq('listing_id', listingId)
           .or(`and(sender_id.eq.${user.id},recipient_id.eq.${recipientId}),and(sender_id.eq.${recipientId},recipient_id.eq.${user.id})`)
           .order('created_at', { ascending: true });
@@ -80,16 +84,17 @@ export default function ChatThreadPage() {
           }, payload => {
             const newMsg = payload.new as Message;
             if (
-              (newMsg.sender_id === user.id && (payload.new as any).recipient_id === recipientId) ||
-              (newMsg.sender_id === recipientId && (payload.new as any).recipient_id === user.id)
+              (newMsg.sender_id === user.id && newMsg.recipient_id === recipientId) ||
+              (newMsg.sender_id === recipientId && newMsg.recipient_id === user.id)
             ) {
-              setMessages(prev => [...prev, newMsg]);
+              // Skip duplicates (the realtime event can arrive after a refetch)
+              setMessages(prev => (prev.some(m => m.id === newMsg.id) ? prev : [...prev, newMsg]));
             }
           })
           .subscribe();
 
-      } catch (err: any) {
-        console.error('Error fetching chat thread:', err?.message || err);
+      } catch (err) {
+        console.error('Error fetching chat thread:', getErrorMessage(err));
       } finally {
         setLoading(false);
       }
@@ -110,6 +115,7 @@ export default function ChatThreadPage() {
     
     const text = newMessage;
     setNewMessage('');
+    setSendError(null);
     setSending(true);
 
     try {
@@ -123,9 +129,15 @@ export default function ChatThreadPage() {
         });
         
       if (error) throw error;
-    } catch (err: any) {
-      console.error('Error sending message:', err?.message || err);
-      // In a real app, you might want to show a toast error here and restore the message text
+    } catch (err) {
+      console.error('Error sending message:', getErrorMessage(err));
+      // Give the text back so the user can retry, and say why it failed.
+      setNewMessage(text);
+      setSendError(
+        getErrorMessage(err).includes('row-level security')
+          ? 'You can only message the seller or bidders of this listing.'
+          : getErrorMessage(err, 'Message not sent. Please try again.')
+      );
     } finally {
       setSending(false);
     }
@@ -194,6 +206,9 @@ export default function ChatThreadPage() {
 
       {/* Input */}
       <div className="glass-card rounded-b-2xl p-4 border-t border-slate-700/50 bg-slate-900/80 backdrop-blur-md">
+        {sendError && (
+          <p role="alert" className="text-sm text-red-400 mb-2">{sendError}</p>
+        )}
         <form onSubmit={handleSend} className="flex space-x-2">
           <input
             type="text"

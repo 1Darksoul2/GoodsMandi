@@ -38,7 +38,8 @@ export type Bid = {
   listing_id: string;
   bidder_id: string;
   bid_amount: number;
-  status: 'pending' | 'selected' | 'rejected';
+  bid_attempts: number;
+  status: 'pending' | 'selected' | 'rejected' | 'backup';
   created_at: string;
   // Joined fields
   bidder?: Profile;

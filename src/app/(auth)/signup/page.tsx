@@ -1,11 +1,12 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { useToast } from '@/components/ui/Toast'
 import { Spinner } from '@/components/ui/Spinner'
+import { getErrorMessage } from '@/lib/errors'
+import { COLLEGE_DOMAIN } from '@/lib/constants'
 
 export default function SignupPage() {
   const [fullName, setFullName] = useState('')
@@ -18,14 +19,14 @@ export default function SignupPage() {
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
   
-  const router = useRouter()
   const { showToast } = useToast()
   const supabase = createClient()
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    if (!email.endsWith('@stu.upes.ac.in')) {
+    const normalizedEmail = email.trim().toLowerCase()
+    if (!normalizedEmail.endsWith(COLLEGE_DOMAIN)) {
       showToast('Registration is restricted to UPES students (@stu.upes.ac.in)', 'error')
       return
     }
@@ -39,7 +40,7 @@ export default function SignupPage() {
 
     try {
       const { error } = await supabase.auth.signUp({
-        email,
+        email: normalizedEmail,
         password,
         options: {
           data: {
@@ -58,9 +59,9 @@ export default function SignupPage() {
         setSuccess(true)
         showToast('Registration successful! Check your email to verify.', 'success')
       }
-    } catch (err: any) {
-      console.error('Signup unexpected error:', JSON.stringify(err, null, 2), 'message:', err?.message, 'stack:', err?.stack)
-      showToast(err?.message || 'An unexpected error occurred.', 'error')
+    } catch (err) {
+      console.error('Signup unexpected error:', err)
+      showToast(getErrorMessage(err, 'An unexpected error occurred.'), 'error')
     } finally {
       setLoading(false)
     }
@@ -76,7 +77,7 @@ export default function SignupPage() {
         </div>
         <h2 className="text-2xl font-semibold text-white mb-2">Check your email</h2>
         <p className="text-slate-400 mb-6">
-          We've sent a verification link to <span className="text-white font-medium">{email}</span>.
+          We&apos;ve sent a verification link to <span className="text-white font-medium">{email}</span>.
         </p>
         <Link href="/login" className="btn-secondary w-full py-2.5 inline-block">
           Return to Login

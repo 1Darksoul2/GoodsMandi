@@ -16,35 +16,38 @@ export default function Navbar() {
   const mobileMenuRef = useRef<HTMLDivElement>(null)
   const pathname = usePathname()
   const router = useRouter()
-  const supabase = createClient()
+  const [supabase] = useState(() => createClient())
   const { showToast } = useToast()
 
   useEffect(() => {
-    const fetchUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      setUser(user)
-      if (user) {
-        // Fetch profile to check if admin
-        const { data } = await supabase
-          .from('profiles')
-          .select('is_admin')
-          .eq('id', user.id)
-          .single()
-        
-        if (data?.is_admin) {
-          setIsAdmin(true)
-        }
+    // Re-checked on every auth change so the Admin link disappears after sign-out
+    // (or a switch to a non-admin account). It is only a UI hint; RLS enforces access.
+    const loadAdminFlag = async (userId: string | undefined) => {
+      if (!userId) {
+        setIsAdmin(false)
+        return
       }
+      const { data } = await supabase
+        .from('profiles')
+        .select('is_admin')
+        .eq('id', userId)
+        .single()
+      setIsAdmin(!!data?.is_admin)
     }
-    
-    fetchUser()
+
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setUser(user)
+      loadAdminFlag(user?.id)
+    })
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null)
+      // Deferred: Supabase calls made inside this callback can deadlock the auth lock.
+      setTimeout(() => loadAdminFlag(session?.user?.id), 0)
     })
 
     return () => subscription.unsubscribe()
-  }, [])
+  }, [supabase])
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {

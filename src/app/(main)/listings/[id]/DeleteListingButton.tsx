@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { getErrorMessage } from '@/lib/errors';
 
 interface DeleteListingButtonProps {
   listingId: string;
@@ -27,8 +28,8 @@ export default function DeleteListingButton({ listingId }: DeleteListingButtonPr
 
       router.push('/listings/my');
       router.refresh();
-    } catch (err: any) {
-      console.error('Error removing listing:', err?.message || err);
+    } catch (err) {
+      console.error('Error removing listing:', getErrorMessage(err));
       alert('Failed to remove listing. Please try again.');
     } finally {
       setLoading(false);

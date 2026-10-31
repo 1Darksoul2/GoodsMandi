@@ -1,9 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { formatPrice, timeAgo } from '@/lib/utils';
+import { minimumBid } from '@/lib/constants';
+import { getErrorMessage } from '@/lib/errors';
 import Image from 'next/image';
 
 interface BidDashboardProps {
@@ -14,14 +16,14 @@ interface BidDashboardProps {
 type Bidder = {
   id: string;
   name: string;
-  profile_photo_url: string;
+  profile_photo_url: string | null;
   rating_avg: number;
 };
 
 type Bid = {
   id: string;
   bid_amount: number;
-  status: string;
+  status: 'pending' | 'selected' | 'rejected' | 'backup';
   created_at: string;
   bidder_id: string;
   bidder: Bidder;
@@ -31,85 +33,79 @@ export default function BidDashboard({ listingId, askingPrice }: BidDashboardPro
   const [bids, setBids] = useState<Bid[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
-  
-  const minThreshold = Math.floor(askingPrice * 0.7);
-  const supabase = createClient();
+  const [supabase] = useState(() => createClient());
 
-  const fetchBids = async () => {
-    setLoading(true);
+  const minThreshold = minimumBid(askingPrice);
+
+  // Pure query; callers decide when to put the result into state.
+  const loadBids = useCallback(async (): Promise<Bid[] | null> => {
     const { data, error } = await supabase
       .from('bids')
       .select(`
-        *,
+        id, bid_amount, status, created_at, bidder_id,
         bidder:profiles!bidder_id(id, name, profile_photo_url, rating_avg)
       `)
       .eq('listing_id', listingId)
-      .order('bid_amount', { ascending: false });
+      .order('bid_amount', { ascending: false })
+      .overrideTypes<Bid[], { merge: false }>();
 
-    if (!error && data) {
-      setBids(data as any);
+    if (error) {
+      console.error('Error fetching bids:', error.message);
+      return null;
     }
-    setLoading(false);
+    return data;
+  }, [listingId, supabase]);
+
+  const fetchBids = async () => {
+    const rows = await loadBids();
+    if (rows) setBids(rows);
   };
 
   useEffect(() => {
-    fetchBids();
-  }, [listingId]);
+    let cancelled = false;
+    loadBids().then((rows) => {
+      if (cancelled) return;
+      if (rows) setBids(rows);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [loadBids]);
 
-  const handleSelectWinner = async (bidId: string, bidderId: string) => {
+  const handleSelectWinner = async (bidId: string) => {
     if (!confirm('Are you sure you want to accept this bid? This will close the listing.')) return;
-    
+
     setActionLoading(`winner-${bidId}`);
     try {
-      // Begin sequence: normally you'd use an RPC for a transaction
-      // 1. Update listing
-      const { error: listingErr } = await supabase
-        .from('listings')
-        .update({ status: 'sold', selected_bidder_id: bidderId })
-        .eq('id', listingId);
-        
-      if (listingErr) throw listingErr;
-      
-      // 2. Update winning bid
-      await supabase.from('bids').update({ status: 'selected' }).eq('id', bidId);
-      
-      // 3. Reject other pending bids
-      await supabase
-        .from('bids')
-        .update({ status: 'rejected' })
-        .eq('listing_id', listingId)
-        .eq('status', 'pending')
-        .neq('id', bidId);
-        
-      fetchBids();
+      // One database transaction: marks the listing sold, the bid selected and rejects the rest.
+      const { error } = await supabase.rpc('select_winning_bid', { p_bid_id: bidId });
+      if (error) throw error;
+      await fetchBids();
     } catch (error) {
       console.error('Error selecting winner:', error);
-      alert('Failed to select winner.');
+      alert(getErrorMessage(error, 'Failed to select winner.'));
     } finally {
       setActionLoading(null);
     }
   };
 
-  const handleSelectBackup = async (bidId: string, bidderId: string) => {
+  const handleSelectBackup = async (bidId: string) => {
     setActionLoading(`backup-${bidId}`);
     try {
-      const { error } = await supabase
-        .from('listings')
-        .update({ backup_bidder_id: bidderId })
-        .eq('id', listingId);
-        
+      const { error } = await supabase.rpc('select_backup_bid', { p_bid_id: bidId });
       if (error) throw error;
-      
-      await supabase.from('bids').update({ status: 'backup' }).eq('id', bidId);
-      fetchBids();
+      await fetchBids();
     } catch (error) {
       console.error('Error selecting backup:', error);
+      alert(getErrorMessage(error, 'Failed to set backup bidder.'));
     } finally {
       setActionLoading(null);
     }
   };
 
   const hasWinner = bids.some(b => b.status === 'selected');
+  const hasBackup = bids.some(b => b.status === 'backup');
 
   if (loading) {
     return <div className="p-8 text-center text-slate-400">Loading bids...</div>;
@@ -160,7 +156,7 @@ export default function BidDashboard({ listingId, askingPrice }: BidDashboardPro
                     <Link href={`/profile/${bid.bidder.id}`} className="flex items-center gap-3 group">
                       <div className="relative w-8 h-8 rounded-full overflow-hidden bg-slate-700">
                         {bid.bidder.profile_photo_url ? (
-                          <Image src={bid.bidder.profile_photo_url} alt={bid.bidder.name} fill className="object-cover" />
+                          <Image src={bid.bidder.profile_photo_url} alt={bid.bidder.name} fill className="object-cover" sizes="32px" />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center text-xs font-bold text-white bg-teal-600">
                             {bid.bidder.name.charAt(0)}
@@ -210,7 +206,7 @@ export default function BidDashboard({ listingId, askingPrice }: BidDashboardPro
                       
                       {!hasWinner && bid.status === 'pending' && (
                         <button
-                          onClick={() => handleSelectWinner(bid.id, bid.bidder_id)}
+                          onClick={() => handleSelectWinner(bid.id)}
                           disabled={actionLoading !== null}
                           className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium transition-colors disabled:opacity-50"
                         >
@@ -218,9 +214,9 @@ export default function BidDashboard({ listingId, askingPrice }: BidDashboardPro
                         </button>
                       )}
                       
-                      {hasWinner && bid.status === 'pending' && (
+                      {hasWinner && !hasBackup && (bid.status === 'pending' || bid.status === 'rejected') && (
                         <button
-                          onClick={() => handleSelectBackup(bid.id, bid.bidder_id)}
+                          onClick={() => handleSelectBackup(bid.id)}
                           disabled={actionLoading !== null}
                           className="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-white text-sm font-medium transition-colors disabled:opacity-50"
                         >

@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 
 export default async function OwnProfilePage() {
   const supabase = await createClient();
@@ -38,9 +39,9 @@ export default async function OwnProfilePage() {
       <div className="glass-card rounded-2xl p-8 flex flex-col md:flex-row items-center md:items-start gap-8 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-64 h-64 bg-brand-500/10 rounded-full blur-3xl -mr-32 -mt-32"></div>
         
-        <div className="w-32 h-32 rounded-full bg-slate-800 border-4 border-slate-700 overflow-hidden flex-shrink-0 flex items-center justify-center z-10 shadow-xl">
+        <div className="relative w-32 h-32 rounded-full bg-slate-800 border-4 border-slate-700 overflow-hidden flex-shrink-0 flex items-center justify-center z-10 shadow-xl">
           {profile.profile_photo_url ? (
-            <img src={profile.profile_photo_url} alt={profile.name} className="w-full h-full object-cover" />
+            <Image src={profile.profile_photo_url} alt={profile.name} fill className="object-cover" sizes="128px" />
           ) : (
             <span className="text-4xl font-bold text-slate-300">{profile.name?.charAt(0) || 'U'}</span>
           )}
@@ -160,7 +161,7 @@ export default async function OwnProfilePage() {
             </div>
           ) : (
             <div className="glass-card p-6 text-center rounded-xl text-slate-400">
-              You haven't placed any bids yet.
+              You haven&apos;t placed any bids yet.
             </div>
           )}
         </div>

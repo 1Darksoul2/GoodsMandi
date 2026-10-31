@@ -1,6 +1,6 @@
 'use client'
 
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react'
+import React, { createContext, useContext, useState, useCallback } from 'react'
 
 type ToastType = 'success' | 'error' | 'info'
 
@@ -49,12 +49,6 @@ export function useToast() {
 }
 
 function ToastItem({ toast, onClose }: { toast: ToastMessage, onClose: () => void }) {
-  const [isVisible, setIsVisible] = useState(false)
-
-  useEffect(() => {
-    setIsVisible(true)
-  }, [])
-
   const icons = {
     success: (
       <svg className="w-5 h-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -81,9 +75,8 @@ function ToastItem({ toast, onClose }: { toast: ToastMessage, onClose: () => voi
 
   return (
     <div
-      className={`transform transition-all duration-300 ease-in-out ${
-        isVisible ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'
-      } flex items-center p-4 rounded-xl border backdrop-blur-md shadow-lg ${bgColors[toast.type]}`}
+      role="status"
+      className={`animate-fade-in-up flex items-center p-4 rounded-xl border backdrop-blur-md shadow-lg ${bgColors[toast.type]}`}
     >
       <div className="flex-shrink-0 mr-3">
         {icons[toast.type]}
@@ -93,6 +86,7 @@ function ToastItem({ toast, onClose }: { toast: ToastMessage, onClose: () => voi
       </div>
       <button
         onClick={onClose}
+        aria-label="Dismiss notification"
         className="flex-shrink-0 text-slate-400 hover:text-white transition-colors"
       >
         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

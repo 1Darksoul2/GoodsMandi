@@ -17,12 +17,21 @@
 
 ## Step 2: Run Database Migrations
 
-1. In your Supabase Dashboard, go to **SQL Editor**
-2. Open `supabase/migrations/001_schema.sql` from this project
-3. Paste the entire contents into the SQL Editor and click **Run**
-4. Then open `supabase/migrations/002_storage.sql` and run it the same way
+In your Supabase Dashboard, go to **SQL Editor** and run each file in `supabase/migrations/` **in order**, one at a time (paste the contents, click **Run**, wait for success):
 
-This creates all tables, enums, triggers, RLS policies, and storage buckets.
+1. `001_schema.sql` — tables, enums, triggers, RLS policies
+2. `002_storage.sql` — storage buckets and their policies
+3. `003_bid_attempts.sql` — bid revision counter
+4. `004_bid_status_backup.sql` — adds the `backup` bid status (must run on its own, before 005)
+5. `005_security_and_integrity.sql` — security hardening: locks admin/ban fields, enforces the college e-mail domain, validates bids, atomic winner selection, deal-only chat and ratings, image-only uploads
+
+Already running an older copy of the app? Run only the files you have not run yet. `005` is safe to run again.
+
+You can test all migrations locally before touching your project (needs Postgres 16 and `psql`):
+
+```bash
+DATABASE_URL=postgres://postgres:postgres@localhost/postgres supabase/tests/run.sh
+```
 
 ---
 
@@ -32,28 +41,13 @@ This creates all tables, enums, triggers, RLS policies, and storage buckets.
 2. Ensure **Email** provider is enabled
 3. Go to **Authentication > URL Configuration**:
    - Set **Site URL** to `http://localhost:3000` (for development)
-   - Add `http://localhost:3000/auth/callback` to **Redirect URLs**
+   - Add `http://localhost:3000/**` to **Redirect URLs** (covers e-mail confirmation and password reset, which both go through `/auth/callback`)
 
 ### Email Domain Restriction
-To restrict signups to `@stu.upes.ac.in` only:
-1. Go to **Authentication > Hooks** (or use the SQL Editor)
-2. Run this SQL to create a hook that validates email domains:
+Migration `005` adds a trigger on `auth.users` that rejects any e-mail not ending in `@stu.upes.ac.in`, so the rule holds even for requests that skip the signup form. Nothing to configure. To change the allowed domain, edit `public.enforce_college_email()` and `COLLEGE_DOMAIN` in `src/lib/constants.ts`.
 
-```sql
-CREATE OR REPLACE FUNCTION public.check_email_domain()
-RETURNS TRIGGER AS $$
-BEGIN
-  IF NEW.email NOT LIKE '%@stu.upes.ac.in' THEN
-    RAISE EXCEPTION 'Only @stu.upes.ac.in email addresses are allowed';
-  END IF;
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- Note: This is also enforced in the application layer
-```
-
-The app also enforces this client-side and server-side, but the database trigger provides defense in depth.
+### Password reset
+The reset e-mail opens `/auth/callback?next=/reset-password`. Supabase uses a one-time code tied to the browser that requested the reset, so the link must be opened in that same browser.
 
 ---
 
@@ -62,6 +56,8 @@ The app also enforces this client-side and server-side, but the database trigger
 The migrations already created two storage buckets:
 - `listing-photos` (public read, authenticated write)
 - `profile-photos` (public read, authenticated write)
+
+Both accept only JPEG, PNG, WebP and GIF images up to 5 MB (set by migration `005`).
 
 Verify they exist by going to **Storage** in your Supabase Dashboard.
 
@@ -103,7 +99,7 @@ Open [http://localhost:3000](http://localhost:3000) to see the app.
 
 1. Sign up through the app with your `@stu.upes.ac.in` email
 2. Go to Supabase Dashboard > **Table Editor > profiles**
-3. Find your user row and set `is_admin` to `true`
+3. Find your user row and set `is_admin` to `true` (the dashboard can still change this column; the app's API cannot)
 4. You can now access the admin dashboard at `/admin`
 
 ---
@@ -114,11 +110,11 @@ Open [http://localhost:3000](http://localhost:3000) to see the app.
 2. Import the repo in [Vercel](https://vercel.com)
 3. Add the environment variables (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`)
 4. Deploy!
-5. Update your Supabase **Site URL** and **Redirect URLs** to your Vercel domain
+5. Update your Supabase **Site URL** to your Vercel domain and add `https://<your-domain>/**` to **Redirect URLs**
 
 ---
 
 ## Tech Stack
-- **Frontend**: Next.js 16 (App Router, TypeScript) + Tailwind CSS v3
+- **Frontend**: Next.js 16.4 (App Router, TypeScript) + Tailwind CSS v3
 - **Backend**: Supabase (Postgres, Auth, Storage, Realtime)
 - **Hosting**: Vercel + Supabase Cloud

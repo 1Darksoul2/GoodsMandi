@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import { formatPrice } from '@/lib/utils';
 
 export default async function OtherUserProfilePage({ params }: { params: Promise<{ userId: string }> }) {
@@ -30,9 +31,9 @@ export default async function OtherUserProfilePage({ params }: { params: Promise
       <div className="glass-card rounded-2xl p-8 flex flex-col md:flex-row items-center md:items-start gap-8 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-64 h-64 bg-brand-500/5 rounded-full blur-3xl -mr-32 -mt-32"></div>
         
-        <div className="w-32 h-32 rounded-full bg-slate-800 border-4 border-slate-700 overflow-hidden flex-shrink-0 flex items-center justify-center z-10 shadow-xl">
+        <div className="relative w-32 h-32 rounded-full bg-slate-800 border-4 border-slate-700 overflow-hidden flex-shrink-0 flex items-center justify-center z-10 shadow-xl">
           {profile.profile_photo_url ? (
-            <img src={profile.profile_photo_url} alt={profile.name} className="w-full h-full object-cover" />
+            <Image src={profile.profile_photo_url} alt={profile.name} fill className="object-cover" sizes="128px" />
           ) : (
             <span className="text-4xl font-bold text-slate-300">{profile.name?.charAt(0) || 'U'}</span>
           )}
@@ -88,7 +89,7 @@ export default async function OtherUserProfilePage({ params }: { params: Promise
       <div className="space-y-4">
         <h2 className="text-xl font-bold text-slate-100 flex items-center gap-2">
           <svg className="w-5 h-5 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
-          {profile.name}'s Active Listings
+          {profile.name}&apos;s Active Listings
         </h2>
         
         {activeListings && activeListings.length > 0 ? (
@@ -97,7 +98,7 @@ export default async function OtherUserProfilePage({ params }: { params: Promise
               <Link key={listing.id} href={`/listings/${listing.id}`} className="block glass-card glass-card-hover rounded-xl overflow-hidden transition-all group flex flex-col h-full">
                 {listing.photos && listing.photos.length > 0 ? (
                   <div className="h-40 overflow-hidden relative">
-                    <img src={listing.photos[0]} alt={listing.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
+                    <Image src={listing.photos[0]} alt={listing.title} fill className="object-cover transition-transform duration-500 group-hover:scale-110" sizes="(max-width: 768px) 100vw, 33vw" />
                     <div className="absolute inset-0 bg-gradient-to-t from-slate-950 to-transparent opacity-60"></div>
                   </div>
                 ) : (
@@ -118,7 +119,7 @@ export default async function OtherUserProfilePage({ params }: { params: Promise
           </div>
         ) : (
           <div className="glass-card p-12 text-center rounded-2xl text-slate-400">
-            This user doesn't have any active listings.
+            This user doesn&apos;t have any active listings.
           </div>
         )}
       </div>

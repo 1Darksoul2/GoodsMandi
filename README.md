@@ -3,10 +3,27 @@ GoodsMandi — a campus-exclusive marketplace where students list items for sale
 
 ## Getting Started
 
-First, run the development server:
+Full setup (Supabase project, migrations, auth settings, environment variables) is in [SETUP.md](SETUP.md). In short:
+
+```bash
+cp .env.local.example .env.local   # then fill in your Supabase URL and anon key
+npm install
+```
+
+Then run the development server:
 
 ```bash
 npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+
+## Checks
+
+```bash
+npm run lint
+npx tsc --noEmit
+supabase/tests/run.sh   # database policies and triggers; needs a local Postgres 16
+```
+
+CI runs all of these on every pull request (`.github/workflows/ci.yml`).
